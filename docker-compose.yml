@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  cyrax-proxy:
+    image: traefik:v2.7
+    container_name: cyrax-proxy
+    command:
+      - "--log.level=INFO"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.network=cyrax"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - 80:80
+      - 8080:8080
+    networks:
+      - cyrax
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+
+  cyrax-api:
+    build: manager
+    image: ruanbekker/cyrax-api:v0.0.1
+    container_name: cyrax-api
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cyrax-api.rule=Host(`cyrax-api.127.0.0.1.nip.io`)"
+      - "traefik.http.routers.cyrax-api.entrypoints=web"
+      # requires if backend port is non-80
+      - "traefik.http.routers.cyrax-api.service=cyrax-api-service"
+      - "traefik.http.services.cyrax-api-service.loadbalancer.server.port=5000"
+    networks:
+      - cyrax
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      cyrax-proxy:
+        condition: service_started
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+
+networks:
+  cyrax:
+    name: cyrax
